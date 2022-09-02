@@ -80,6 +80,14 @@ build-debug: build-deps ## Builds binaries appropriate for debugging
 	@echo "==> $@"
 	@CGO_ENABLED=0 GO111MODULE=on $(GO) build -gcflags="all=-N -l" -o $(BINDIR)/$(NAME) ./cmd/"$(NAME)"
 
+docker-debug:
+		@echo "Building debug image harbor.devportal.dalet.cloud/webnews-dev/pomerium/pomerium:v0.18.0"
+		@docker build --network host -t harbor.devportal.dalet.cloud/webnews-dev/pomerium/pomerium:v0.18.0 -f Dockerfile.debug .
+		@echo "Done"
+
+docker-debug-push: docker-debug
+		@docker push harbor.devportal.dalet.cloud/webnews-dev/pomerium/pomerium:v0.18.0
+
 .PHONY: build-go
 build-go: build-deps
 	@echo "==> $@"
