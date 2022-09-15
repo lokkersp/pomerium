@@ -124,13 +124,16 @@ func NewFileOrEnvironmentSource(
 	cfg.AllocatePorts(*(*[5]string)(ports))
 
 	metrics.SetConfigInfo(ctx, cfg.Options.Services, "local", cfg.Checksum(), true)
-
+	watcher, err := fileutil.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
 	src := &FileOrEnvironmentSource{
 		configFile: configFile,
-		watcher:    fileutil.NewWatcher(),
+		watcher:    watcher,
 		config:     cfg,
 	}
-	src.watcher.Add(configFile)
+	src.watcher.AddPath(configFile)
 	ch := src.watcher.Bind()
 	go func() {
 		for range ch {
@@ -183,10 +186,14 @@ type FileWatcherSource struct {
 }
 
 // NewFileWatcherSource creates a new FileWatcherSource
-func NewFileWatcherSource(underlying Source) *FileWatcherSource {
+func NewFileWatcherSource(underlying Source) (*FileWatcherSource, error) {
+	w, err := fileutil.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
 	src := &FileWatcherSource{
 		underlying: underlying,
-		watcher:    fileutil.NewWatcher(),
+		watcher:    w,
 	}
 
 	ch := src.watcher.Bind()
@@ -200,7 +207,7 @@ func NewFileWatcherSource(underlying Source) *FileWatcherSource {
 	})
 	src.check(context.TODO(), underlying.GetConfig())
 
-	return src
+	return src, nil
 }
 
 // GetConfig gets the underlying config.
@@ -258,7 +265,7 @@ func (src *FileWatcherSource) check(ctx context.Context, cfg *Config) {
 		_, _ = h.Write([]byte{0})
 		bs, err := os.ReadFile(f)
 		if err == nil {
-			src.watcher.Add(f)
+			src.watcher.AddPath(f)
 			_, _ = h.Write(bs)
 		}
 	}
