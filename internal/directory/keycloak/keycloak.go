@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Nerzal/gocloak/v11"
-	"github.com/pomerium/pomerium/internal/directory"
+	"github.com/pomerium/pomerium/pkg/grpc/directory"
 	"sort"
 	"strings"
 )
