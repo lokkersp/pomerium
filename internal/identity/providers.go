@@ -5,6 +5,7 @@ package identity
 import (
 	"context"
 	"fmt"
+	"github.com/pomerium/pomerium/internal/directory/keycloak"
 	"net/url"
 	"sync/atomic"
 
@@ -48,7 +49,7 @@ func NewAuthenticator(o oauth.Options) (a Authenticator, err error) {
 		a, err = github.New(ctx, &o)
 	case google.Name:
 		a, err = google.New(ctx, &o)
-	case oidc.Name:
+	case oidc.Name, keycloak.Name:
 		a, err = oidc.New(ctx, &o)
 	case okta.Name:
 		a, err = okta.New(ctx, &o)
