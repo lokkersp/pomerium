@@ -45,13 +45,17 @@ func (p *Provider) User(ctx context.Context, userID, accessToken string) (*direc
 	if err != nil {
 		return nil, err
 	}
-
-	return &directory.User{
-		Id:          *u.ID,
-		DisplayName: fmt.Sprintf("%s %s", *u.FirstName, *u.LastName),
-		Email:       *u.Email,
-		GroupIds:    *u.Groups,
-	}, nil
+	du := &directory.User{
+		Id: *u.ID,
+	}
+	du.DisplayName = getDisplayName(u)
+	if u.Email != nil {
+		du.Email = *u.Email
+	}
+	if u.Groups != nil {
+		du.GroupIds = *u.Groups
+	}
+	return du, nil
 }
 
 func getGroupUsers(ctx context.Context, client gocloak.GoCloak, token, realm, groupId string) ([]*gocloak.User, error) {
@@ -60,6 +64,20 @@ func getGroupUsers(ctx context.Context, client gocloak.GoCloak, token, realm, gr
 		return nil, err
 	}
 	return members, nil
+}
+
+func getDisplayName(u *gocloak.User) string {
+	displayName := ""
+	if u == nil {
+		return displayName
+	}
+	if u.FirstName != nil {
+		displayName = *u.FirstName
+	}
+	if u.LastName != nil {
+		displayName = fmt.Sprintf("%s %s", displayName, *u.LastName)
+	}
+	return displayName
 }
 
 // UserGroups returns all the users and groups in the directory.
@@ -90,10 +108,11 @@ func (p *Provider) UserGroups(ctx context.Context) ([]*directory.Group, []*direc
 		for _, u := range apiUsers {
 			du, ok := directoryUserLookup[*u.ID]
 			if !ok {
-				du = &directory.User{
-					Id:          *u.ID,
-					DisplayName: fmt.Sprintf("%s %s", *u.FirstName, *u.LastName),
-					Email:       *u.Email,
+				du = &directory.User{}
+				du.Id = *u.ID
+				du.DisplayName = getDisplayName(u)
+				if u.Email != nil {
+					du.Email = *u.Email
 				}
 				directoryUserLookup[*u.ID] = du
 			}
