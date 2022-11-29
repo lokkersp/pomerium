@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/open-policy-agent/opa/ast"
@@ -133,6 +135,11 @@ func (s *Store) GetDataBrokerRecordOption() func(*rego.Rego) {
 		if msg == nil {
 			if msg == nil {
 				return ast.NullTerm(), nil
+			}
+			if exp, ok := msg.(interface{ GetExpiresAt() *timestamppb.Timestamp }); ok && exp.GetExpiresAt() != nil {
+				if exp.GetExpiresAt().AsTime().Before(time.Now()) {
+					return ast.NullTerm(), nil
+				}
 			}
 		}
 		obj := toMap(msg)

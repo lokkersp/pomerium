@@ -22,8 +22,11 @@ func TestWatcher(t *testing.T) {
 		return
 	}
 
-	w := NewWatcher()
-	w.Add(filepath.Join(tmpdir, "test1.txt"))
+	w, err := NewWatcher()
+	if !assert.NoError(t, err) {
+		return
+	}
+	w.AddPath(filepath.Join(tmpdir, "test1.txt"))
 
 	ch := w.Bind()
 	defer w.Unbind(ch)

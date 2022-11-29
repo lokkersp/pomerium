@@ -17,7 +17,7 @@ require (
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-jose/go-jose/v3 v3.0.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -51,7 +51,6 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/procfs v0.7.3
-	github.com/rjeczalik/notify v0.9.3-0.20201210012515-e2a77dcc14cf
 	github.com/rs/cors v1.8.2
 	github.com/rs/zerolog v1.27.0
 	github.com/scylladb/go-set v1.0.2
@@ -78,6 +77,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require github.com/Nerzal/gocloak/v11 v11.2.0
 
 require (
 	4d63.com/gochecknoglobals v0.1.0 // indirect
@@ -133,6 +134,7 @@ require (
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/go-toolsmith/astcast v1.0.0 // indirect
 	github.com/go-toolsmith/astcopy v1.0.0 // indirect
 	github.com/go-toolsmith/astequal v1.0.1 // indirect
@@ -144,6 +146,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/golangci/check v0.0.0-20180506172741-cfe4005ccda2 // indirect
@@ -217,6 +220,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
 	github.com/opencontainers/runc v1.1.2 // indirect
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/phayes/checkstyle v0.0.0-20170904204023-bfd46e6a821d // indirect
@@ -236,6 +240,7 @@ require (
 	github.com/ryanrolds/sqlclosecheck v0.3.0 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.0.6 // indirect
 	github.com/securego/gosec/v2 v2.11.0 // indirect
+	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/shazow/go-diff v0.0.0-20160112020656-b6b7b6733b8c // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/sivchari/containedctx v1.0.2 // indirect
