@@ -2,61 +2,113 @@ package fileutil
 
 import (
 	"context"
+	"github.com/fsnotify/fsnotify"
+	"path/filepath"
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
-	"namespacelabs.dev/go-filenotify"
 
-	"github.com/pomerium/pomerium/internal/chanutil"
 	"github.com/pomerium/pomerium/internal/log"
 	"github.com/pomerium/pomerium/internal/signal"
 )
 
+type watcher = fsnotify.Watcher
+
+func newWatcher() (*watcher, error) {
+	return fsnotify.NewWatcher()
+}
+
+func newWatcherObject() *watcher {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil
+	}
+	return w
+}
+
 // A Watcher watches files for changes.
 type Watcher struct {
 	*signal.Signal
-
-	mu             sync.Mutex
-	watching       map[string]struct{}
-	eventWatcher   filenotify.FileWatcher
-	pollingWatcher filenotify.FileWatcher
+	mu        sync.Mutex
+	filePaths map[string]bool
+	W         *fsnotify.Watcher
 }
 
 // NewWatcher creates a new Watcher.
-func NewWatcher() *Watcher {
-	return &Watcher{
-		Signal:   signal.New(),
-		watching: make(map[string]struct{}),
+func NewWatcher() (*Watcher, error) {
+	w, err := newWatcher()
+	if err != nil {
+		return nil, err
 	}
+	return &Watcher{
+		Signal:    signal.New(),
+		filePaths: map[string]bool{},
+		W:         w,
+	}, nil
 }
 
-// Add adds a new watch.
-func (watcher *Watcher) Add(filePath string) {
-	watcher.mu.Lock()
-	defer watcher.mu.Unlock()
-
+// AddPath: new implementation based on fsnotify library
+func (watcher *Watcher) AddPath(path string) {
+	initWG := sync.WaitGroup{}
+	initWG.Add(1)
 	// already watching
-	if _, ok := watcher.watching[filePath]; ok {
+	if _, ok := watcher.filePaths[path]; ok {
+		initWG.Done()
 		return
 	}
-
-	ctx := log.WithContext(context.Background(), func(c zerolog.Context) zerolog.Context {
-		return c.Str("watch_file", filePath)
+	ctx := log.WithContext(context.TODO(), func(c zerolog.Context) zerolog.Context {
+		return c.Str("watch_file", path)
 	})
-	watcher.initLocked(ctx)
+	go func() {
+		configFile := filepath.Clean(path)
+		configDir, _ := filepath.Split(configFile)
+		realConfigFile, _ := filepath.EvalSymlinks(path)
 
-	if watcher.eventWatcher != nil {
-		if err := watcher.eventWatcher.Add(filePath); err != nil {
-			log.Error(ctx).Msg("fileutil/watcher: failed to watch file with event-based file watcher")
-		}
-	}
+		eventsWG := sync.WaitGroup{}
+		eventsWG.Add(1)
+		go func() {
+			for {
+				select {
+				case event, ok := <-watcher.W.Events:
+					if !ok { // 'Events' channel is closed
+						eventsWG.Done()
+						return
+					}
+					currentConfigFile, _ := filepath.EvalSymlinks(path)
+					// we only care about the config file with the following cases:
+					// 1 - if the config file was modified or created
+					// 2 - if the real path to the config file changed (eg: k8s ConfigMap replacement)
+					const writeOrCreateMask = fsnotify.Write | fsnotify.Create
+					if (filepath.Clean(event.Name) == configFile &&
+						event.Op&writeOrCreateMask != 0) ||
+						(currentConfigFile != "" && currentConfigFile != realConfigFile) {
+						realConfigFile = currentConfigFile
+						log.Info(ctx).Str("event", event.String()).Str("config", realConfigFile).Msg("filemgr: detected file change")
+						watcher.Signal.Broadcast(ctx)
+					} else if filepath.Clean(event.Name) == configFile &&
+						event.Op&fsnotify.Remove != 0 {
+						eventsWG.Done()
+						return
+					}
 
-	if watcher.pollingWatcher != nil {
-		if err := watcher.pollingWatcher.Add(filePath); err != nil {
-			log.Error(ctx).Msg("fileutil/watcher: failed to watch file with polling-based file watcher")
+				case err, ok := <-watcher.W.Errors:
+					if ok { // 'Errors' channel is not closed
+						log.Printf("watcher error: %v\n", err)
+					}
+					eventsWG.Done()
+					return
+				}
+			}
+		}()
+		err := watcher.W.Add(configDir)
+		if err != nil {
+			log.Error(ctx).Err(err).Msg("filemgr: error watching file path")
 		}
-	}
+		watcher.filePaths[path] = true
+		initWG.Done()   // done initializing the watch in this go routine, so the parent routine can move on...
+		eventsWG.Wait() // now, wait for event loop to end in this go-routine...
+	}()
+	initWG.Wait()
 }
 
 // Clear removes all watches.
@@ -64,57 +116,10 @@ func (watcher *Watcher) Clear() {
 	watcher.mu.Lock()
 	defer watcher.mu.Unlock()
 
-	if w := watcher.eventWatcher; w != nil {
-		_ = watcher.pollingWatcher.Close()
-		watcher.eventWatcher = nil
+	for filePath, _ := range watcher.filePaths {
+		//notify.Stop(ch)
+		watcher.W.Remove(filePath)
+		//close(ch)
+		delete(watcher.filePaths, filePath)
 	}
-
-	if w := watcher.pollingWatcher; w != nil {
-		_ = watcher.pollingWatcher.Close()
-		watcher.pollingWatcher = nil
-	}
-
-	watcher.watching = make(map[string]struct{})
-}
-
-func (watcher *Watcher) initLocked(ctx context.Context) {
-	if watcher.eventWatcher != nil || watcher.pollingWatcher != nil {
-		return
-	}
-
-	if watcher.eventWatcher == nil {
-		var err error
-		watcher.eventWatcher, err = filenotify.NewEventWatcher()
-		if err != nil {
-			log.Error(ctx).Msg("fileutil/watcher: failed to create event-based file watcher")
-		}
-	}
-	if watcher.pollingWatcher == nil {
-		watcher.pollingWatcher = filenotify.NewPollingWatcher(nil)
-	}
-
-	var errors <-chan error = watcher.pollingWatcher.Errors()          //nolint
-	var events <-chan fsnotify.Event = watcher.pollingWatcher.Events() //nolint
-
-	if watcher.eventWatcher != nil {
-		errors = chanutil.Merge(errors, watcher.eventWatcher.Errors())
-		events = chanutil.Merge(events, watcher.eventWatcher.Events())
-	}
-
-	// log errors
-	go func() {
-		for err := range errors {
-			log.Error(ctx).Err(err).Msg("fileutil/watcher: file notification error")
-		}
-	}()
-
-	// handle events
-	go func() {
-		for evts := range chanutil.Batch(events) {
-			for _, evt := range evts {
-				log.Info(ctx).Str("name", evt.Name).Str("op", evt.Op.String()).Msg("fileutil/watcher: file notification event")
-			}
-			watcher.Broadcast(ctx)
-		}
-	}()
 }

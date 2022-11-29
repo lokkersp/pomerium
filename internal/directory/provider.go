@@ -14,6 +14,7 @@ import (
 	"github.com/pomerium/pomerium/internal/directory/github"
 	"github.com/pomerium/pomerium/internal/directory/gitlab"
 	"github.com/pomerium/pomerium/internal/directory/google"
+	"github.com/pomerium/pomerium/internal/directory/keycloak"
 	"github.com/pomerium/pomerium/internal/directory/okta"
 	"github.com/pomerium/pomerium/internal/directory/onelogin"
 	"github.com/pomerium/pomerium/internal/directory/ping"
@@ -172,6 +173,20 @@ func GetProvider(options Options) (provider Provider) {
 			Str("provider", options.Provider).
 			Err(err).
 			Msg("invalid service account for ping directory provider")
+	case keycloak.Name:
+		sa, err := keycloak.ParseServiceAccount(options)
+		if err == nil {
+			return keycloak.New(sa.EndpointUrl,
+				sa.ClientID,
+				sa.ClientSecret,
+				sa.Realm)
+		}
+		errSyncDisabled = fmt.Errorf("invalid keycloak service account: %w", err)
+		log.Warn(ctx).
+			Str("service", "directory").
+			Str("provider", options.Provider).
+			Err(err).
+			Msg("invalid service account for auth0 directory provider")
 	case "":
 		errSyncDisabled = fmt.Errorf("no directory provider configured")
 	default:
