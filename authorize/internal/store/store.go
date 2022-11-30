@@ -132,14 +132,13 @@ func (s *Store) GetDataBrokerRecordOption() func(*rego.Rego) {
 		}
 
 		msg, _ := res.GetRecords()[0].GetData().UnmarshalNew()
+
 		if msg == nil {
-			if msg == nil {
+			return ast.NullTerm(), nil
+		}
+		if exp, ok := msg.(interface{ GetExpiresAt() *timestamppb.Timestamp }); ok && exp.GetExpiresAt() != nil {
+			if exp.GetExpiresAt().AsTime().Before(time.Now()) {
 				return ast.NullTerm(), nil
-			}
-			if exp, ok := msg.(interface{ GetExpiresAt() *timestamppb.Timestamp }); ok && exp.GetExpiresAt() != nil {
-				if exp.GetExpiresAt().AsTime().Before(time.Now()) {
-					return ast.NullTerm(), nil
-				}
 			}
 		}
 
