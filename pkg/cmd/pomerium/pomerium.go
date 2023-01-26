@@ -6,9 +6,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	envoy_service_auth_v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"golang.org/x/sync/errgroup"
@@ -28,6 +31,9 @@ import (
 	"github.com/pomerium/pomerium/pkg/envoy/files"
 	"github.com/pomerium/pomerium/proxy"
 )
+
+const DEFAULT_PPROF_PORT = "6969"
+const DEFAULT_PPROF_SECONDS = 60
 
 // Run runs the main pomerium application.
 func Run(ctx context.Context, src config.Source) error {
@@ -90,7 +96,29 @@ func Run(ctx context.Context, src config.Source) error {
 		return fmt.Errorf("error creating envoy server: %w", err)
 	}
 	defer envoyServer.Close()
-
+	if src.GetConfig().Options.Debug {
+		// todo allocate port, setup debug
+		pprofPort := os.Getenv("PPROF_PORT")
+		pprofTime := os.Getenv("PPROF_TIME_SECONDS")
+		profileDuration := DEFAULT_PPROF_SECONDS
+		if len(pprofPort) == 0 {
+			pprofPort = DEFAULT_PPROF_PORT
+		}
+		if len(pprofTime) != 0 {
+			v, err := strconv.Atoi(pprofTime)
+			if err != nil {
+				log.Printf("Fail to convert to int:%s. Err:%v", pprofTime, err)
+				profileDuration = v
+			} else {
+				profileDuration = DEFAULT_PPROF_SECONDS
+			}
+		}
+		go func() {
+			srv := &http.Server{Addr: fmt.Sprintf(":%s", pprofPort),
+				WriteTimeout: time.Duration(profileDuration) * time.Minute}
+			srv.ListenAndServe()
+		}()
+	}
 	// add services
 	if err := setupAuthenticate(ctx, src, controlPlane); err != nil {
 		return err
